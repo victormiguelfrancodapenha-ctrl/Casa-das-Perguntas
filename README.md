@@ -1,2 +1,520 @@
 # Casa-das-Perguntas
 Joguinho para juntar a galera!
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Casa das Perguntas — Jogo Prank & Party</title>
+<style>
+  :root{
+    --bg1:#ffecd2; --bg2:#fcb69f;
+    --accent1:#ff6b6b; --accent2:#6bffb3; --accent3:#6bc8ff;
+    --card:#ffffffaa; --glass: rgba(255,255,255,0.18);
+    --glass-2: rgba(255,255,255,0.06);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%; margin:0; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg,var(--bg1),var(--bg2));}
+  .app{width:96%; max-width:1100px; min-height:640px; box-shadow: 0 10px 40px rgba(0,0,0,0.18); border-radius:18px; background:linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)); padding:18px; display:flex; flex-direction:column; gap:12px; overflow:hidden;}
+  header{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+  header h1{margin:0; font-size:20px; letter-spacing:0.6px; display:flex; gap:8px; align-items:center;}
+  .logo{font-weight:800; color:var(--accent1); background:linear-gradient(90deg,var(--accent2),var(--accent3)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .controls{display:flex; gap:8px; align-items:center;}
+  button{background:var(--card); border:none; padding:10px 14px; border-radius:10px; cursor:pointer; box-shadow: 0 6px 18px rgba(0,0,0,0.08); font-weight:600;}
+  button.primary{background:linear-gradient(90deg,var(--accent1),var(--accent3)); color:white; box-shadow:0 8px 22px rgba(0,0,0,0.14);}
+  main{display:flex; gap:12px; flex:1; align-items:stretch;}
+  .left, .right{background:var(--glass); border-radius:12px; padding:14px;}
+  .left{flex:1; min-width:360px; display:flex; flex-direction:column; gap:14px;}
+  .right{width:360px; display:flex; flex-direction:column; gap:12px;}
+  .card{background:rgba(255,255,255,0.85); border-radius:12px; padding:12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06);}
+  .players{display:flex; flex-direction:column; gap:8px; max-height:240px; overflow:auto;}
+  .player{display:flex; align-items:center; gap:8px; padding:8px; border-radius:8px;}
+  .player .avatar{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .player .name{font-weight:700;}
+  label.input{display:flex; gap:8px; align-items:center;}
+  input[type="text"]{padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.06); flex:1;}
+  .stage{display:flex; gap:8px; align-items:center;}
+  .stage .pill{padding:6px 10px; border-radius:999px; background:var(--glass-2); font-weight:700;}
+  .question-area{display:flex;flex-direction:column; gap:12px; align-items:stretch; justify-content:center; flex:1;}
+  .question-title{font-size:18px; font-weight:800;}
+  .options{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .option{background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85)); padding:12px; border-radius:10px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.06); border:3px solid transparent; font-weight:800; display:flex; align-items:center; gap:8px;}
+  .option.troll{border-style:dashed;}
+  .option.correct{border-color:rgba(50,200,100,0.9); transform:translateY(-4px);}
+  .meta{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .scoreboard{display:flex; flex-direction:column; gap:8px; max-height:420px; overflow:auto;}
+  .team-list{display:flex; flex-direction:column; gap:8px;}
+  footer{display:flex; justify-content:space-between; align-items:center;}
+  .confetti{position:absolute; pointer-events:none; inset:0;}
+  .big-emoji{font-size:48px;}
+  @media(max-width:960px){
+    main{flex-direction:column;}
+    .right{width:auto;}
+    .options{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <canvas id="conf" class="confetti"></canvas>
+  <header>
+    <h1><span class="logo">CASA</span> das Perguntas 🎉 <small style="font-weight:400; font-size:12px; margin-left:6px;">(Party & Troll edition)</small></h1>
+    <div class="controls">
+      <div class="stage card" id="stagePill">Lobby</div>
+      <button id="btnReset" title="Reiniciar tudo">Reset</button>
+      <button class="primary" id="btnNext">Próxima fase</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="left">
+      <div class="card" id="lobbyCard">
+        <h3>Lobby — Adicione jogadores</h3>
+        <div style="display:flex; gap:8px;">
+          <input id="playerName" type="text" placeholder="Nome do jogador (ex: Maria)" />
+          <button id="addPlayer">Adicionar</button>
+        </div>
+        <div class="players card" id="playersList" style="margin-top:10px;"></div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button id="startGame" class="primary">Começar (mín 2)</button>
+          <button id="partyMode">Modo Festa (auto rode)</button>
+        </div>
+      </div>
+
+      <div class="card question-area" id="gameArea" style="display:none;">
+        <div class="meta">
+          <div><strong id="turnLabel">Turno:</strong> <span id="currentPlayer"></span></div>
+          <div><strong>Pontos:</strong> <span id="scoreLabel">0</span></div>
+        </div>
+        <div class="question-title" id="questionText">Pergunta aparece aqui</div>
+
+        <div class="options" id="optionsBox"></div>
+
+        <div style="display:flex; gap:8px; justify-content:space-between; align-items:center;">
+          <div id="feedback" style="font-weight:800;"></div>
+          <div style="display:flex; gap:8px;">
+            <button id="skipBtn">Skip (pular)</button>
+            <button id="nextQ" class="primary" style="display:none;">Próxima pergunta</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="finalCard" style="display:none;">
+        <h2>Final Showdown</h2>
+        <div id="finalText"></div>
+        <div style="margin-top:10px;">
+          <button id="restartBtn" class="primary">Jogar outra vez</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card">
+        <h3>Placar</h3>
+        <div id="scoreboard" class="scoreboard"></div>
+      </div>
+
+      <div class="card">
+        <h3>Equipes</h3>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button id="makeTeams">Formar equipes</button>
+          <button id="clearTeams">Limpar</button>
+        </div>
+        <div id="teams" class="team-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>Como jogar</h3>
+        <ol style="padding-left:14px;">
+          <li>Adicione jogadores no <em>Lobby</em>.</li>
+          <li>Clique em <strong>Começar</strong>.</li>
+          <li>Responda por turnos. Só 1 alternativa é correta.</li>
+          <li>Na <em>Troll Round</em> cuidado: opções podem pregar peças!</li>
+        </ol>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div style="font-weight:700;">Feito com ☀️ e trocentos trolls</div>
+    <div style="display:flex; gap:8px;">
+      <button id="exportBtn">Exportar perguntas</button>
+      <button id="importBtn">Importar perguntas</button>
+      <input id="importFile" type="file" accept=".json" style="display:none;" />
+    </div>
+  </footer>
+</div>
+
+<script>
+/*
+  Casa das Perguntas — Party & Troll edition
+  - Salve como index.html e abra no navegador.
+  - Personalize o array QUESTIONS abaixo.
+*/
+
+const QUESTIONS = [
+  // Warm-up
+  {stage:'warm', q:'Qual é a capital do Brasil?', options:['Rio de Janeiro','São Paulo','Brasília','Salvador'], correct:2},
+  {stage:'warm', q:'Quantos dias tem fevereiro em ano bissexto?', options:['28','29','30','31'], correct:1},
+  {stage:'warm', q:'Qual destes é um mamífero?', options:['Tubarão','Golfinho','Polvo','Pombo'], correct:1},
+
+  // Team-Up (médio)
+  {stage:'team', q:'Que instrumento tem 6 cordas normalmente?', options:['Violino','Guitarra','Flauta','Trompete'], correct:1},
+  {stage:'team', q:'Qual elemento químico tem símbolo O?', options:['Ouro','Prata','Oxigênio','Ozônio'], correct:2},
+
+  // Trolls: isTroll true marks options that are "pegadinha" — they parecem corretas mas castigam com -1 ponto e som
+  {stage:'troll', q:'Troll: Qual alternativa é "A resposta certa é a C"?', options:[
+    {text:'A — claro que é A', isTroll:true},
+    {text:'B — talvez B', isTroll:true},
+    {text:'C — PARECE correta (armadilha!)', isTroll:true},
+    {text:'D — Resposta real: nada disso', isTroll:false}
+  ], correct:3},
+  {stage:'troll', q:'Troll: O que acontece quando você escolhe a "estrela"?', options:[
+    {text:'Você ganha 100 pontos!', isTroll:true},
+    {text:'Você abre um meme', isTroll:false},
+    {text:'Você perde turno', isTroll:true},
+    {text:'Nada — só brilho', isTroll:false}
+  ], correct:1},
+
+  // Final
+  {stage:'final', q:'Qual é a velocidade da luz (aprox.)?', options:['300.000 km/s','30.000 km/s','3.000 km/s','300 km/s'], correct:0},
+  {stage:'final', q:'Quem escreveu "Dom Casmurro"?', options:['Jorge Amado','Machado de Assis','Clarice Lispector','Carlos Drummond'], correct:1}
+];
+
+// Utility helpers
+const el = id => document.getElementById(id);
+const confCanvas = el('conf');
+const ctx = confCanvas.getContext('2d');
+function resizeConf(){ confCanvas.width = window.innerWidth; confCanvas.height = window.innerHeight; }
+window.addEventListener('resize', resizeConf);
+resizeConf();
+
+// Simple confetti (emoji shower)
+let confettiRun = null;
+function burstConfetti(n=30){
+  const emojis = ['🎉','✨','💥','🪅','🥳','🍾','🌈'];
+  let sparks = [];
+  for(let i=0;i<n;i++){
+    sparks.push({
+      x: Math.random()*confCanvas.width,
+      y: -20 - Math.random()*200,
+      vx: (Math.random()-0.5)*6,
+      vy: 1+Math.random()*4,
+      emoji: emojis[Math.floor(Math.random()*emojis.length)],
+      size: 12 + Math.random()*28,
+      rot: Math.random()*6
+    });
+  }
+  let t=0;
+  if(confettiRun) cancelAnimationFrame(confettiRun);
+  function frame(){
+    t+=1;
+    ctx.clearRect(0,0,confCanvas.width, confCanvas.height);
+    sparks.forEach(s=>{
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vy += 0.08;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(Math.sin(t/10 + s.rot));
+      ctx.font = `${s.size}px serif`;
+      ctx.fillText(s.emoji, 0,0);
+      ctx.restore();
+    });
+    sparks = sparks.filter(s=>s.y < confCanvas.height+50);
+    if(sparks.length>0) confettiRun = requestAnimationFrame(frame);
+    else { ctx.clearRect(0,0,confCanvas.width, confCanvas.height); confettiRun=null; }
+  }
+  frame();
+}
+
+// Sounds
+function beep(){ let o = new AudioContext(); let g = o.createOscillator(); let amp = o.createGain(); g.connect(amp); amp.connect(o.destination); g.type='sine'; g.frequency.value=600; amp.gain.value=0.06; g.start(); setTimeout(()=>{g.stop(); o.close();},120); }
+function trollSound(){ let a=new AudioContext(); let o=a.createOscillator(), g=a.createGain(); o.connect(g); g.connect(a.destination); o.type='square'; o.frequency.value=140; g.gain.value=0.08; o.start(); setTimeout(()=>{o.stop(); a.close();},350); }
+
+// Game state
+let players = []; // {name, score, id}
+let teams = []; // arrays of player ids
+let currentStageIndex = 0;
+const STAGES = ['Lobby','Warm-up','Team-Up','Troll Round','Final Showdown'];
+let activeQuestions = [];
+let questionIndex = 0;
+let currentPlayerIndex = 0;
+let partyAuto = false;
+
+// DOM refs
+const playersList = el('playersList'), scoreLabel = el('scoreLabel'), scoreboard = el('scoreboard'), teamsBox = el('teams');
+const stagePill = el('stagePill'), gameArea = el('gameArea'), lobbyCard = el('lobbyCard'), finalCard = el('finalCard');
+const questionText = el('questionText'), optionsBox = el('optionsBox'), feedback = el('feedback'), currentPlayer = el('currentPlayer');
+const btnNext = el('btnNext'), btnReset = el('btnReset'), addPlayerBtn = el('addPlayer'), startBtn = el('startGame'), partyBtn = el('partyMode');
+const nextQBtn = el('nextQ'), skipBtn = el('skipBtn'), makeTeamsBtn = el('makeTeams'), clearTeamsBtn = el('clearTeams');
+const exportBtn = el('exportBtn'), importBtn = el('importBtn'), importFile = el('importFile');
+const restartBtn = el('restartBtn');
+
+// helpers
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function renderPlayers(){
+  playersList.innerHTML='';
+  players.forEach((p, i)=>{
+    const div = document.createElement('div'); div.className='player';
+    div.innerHTML = `
+      <div class="avatar" style="background:linear-gradient(135deg,${pickColor(p.id)}50,${pickColor(p.id)})">${p.name[0]?.toUpperCase()||'?'}</div>
+      <div style="display:flex;flex-direction:column; flex:1;">
+        <div style="display:flex; justify-content:space-between; gap:8px;">
+          <div class="name">${p.name}</div>
+          <div style="font-weight:800;">${p.score} pts</div>
+        </div>
+      </div>
+      <div><button data-id="${p.id}" class="remove">❌</button></div>
+    `;
+    playersList.appendChild(div);
+  });
+  document.querySelectorAll('.remove').forEach(b=>{
+    b.onclick = (e)=>{
+      const id = e.target.dataset.id;
+      players = players.filter(p=>p.id!==id); renderPlayers(); renderScoreboard();
+    };
+  });
+}
+
+function renderScoreboard(){
+  scoreboard.innerHTML='';
+  players.slice().sort((a,b)=>b.score-a.score).forEach(p=>{
+    const div = document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between';
+    div.style.padding='8px'; div.style.borderRadius='8px'; div.innerHTML = `<div style="font-weight:800;">${p.name}</div><div style="font-weight:900;">${p.score}</div>`;
+    scoreboard.appendChild(div);
+  });
+}
+
+function pickColor(seed){
+  // simple deterministic pick
+  const colors = ['#FF6B6B','#FFD93D','#6BC8FF','#7D5FFF','#6BFFB3','#FF8FCF','#FFB07C'];
+  let num = 0; for(let i=0;i<seed.length;i++) num += seed.charCodeAt(i);
+  return colors[num % colors.length];
+}
+
+// Lobby actions
+el('playerName').addEventListener('keydown', e=>{ if(e.key==='Enter') addPlayer(); });
+addPlayerBtn.onclick = addPlayer;
+function addPlayer(){
+  const input = el('playerName'); const name = input.value.trim();
+  if(!name) { input.focus(); return; }
+  players.push({id:uid(), name, score:0});
+  input.value=''; renderPlayers(); renderScoreboard();
+}
+
+startBtn.onclick = startGame;
+partyBtn.onclick = ()=>{ partyAuto = true; startGame(); };
+
+btnNext.onclick = ()=>{ advanceStage(1); };
+btnReset.onclick = resetAll;
+
+function startGame(){
+  if(players.length < 2){ alert('Adicione pelo menos 2 jogadores para começar!'); return; }
+  currentStageIndex = 1; // Warm-up
+  stagePill.textContent = STAGES[currentStageIndex];
+  lobbyCard.style.display='none';
+  gameArea.style.display='flex';
+  finalCard.style.display='none';
+  // copy active question set by stage
+  prepareQuestionsForStage();
+  questionIndex = 0;
+  currentPlayerIndex = 0;
+  partyAuto = !!partyAuto;
+  renderQuestion();
+  renderScoreboard();
+}
+
+function resetAll(){
+  if(!confirm('Reiniciar o jogo?')) return;
+  players = []; teams = []; currentStageIndex = 0; activeQuestions=[]; questionIndex=0; currentPlayerIndex=0; partyAuto=false;
+  renderPlayers(); renderScoreboard(); teamsBox.innerHTML=''; stagePill.textContent='Lobby';
+  lobbyCard.style.display='block'; gameArea.style.display='none'; finalCard.style.display='none';
+}
+
+// Stage progression & question filtering
+function advanceStage(n){
+  currentStageIndex = Math.min(STAGES.length-1, currentStageIndex + n);
+  stagePill.textContent = STAGES[currentStageIndex];
+  if(currentStageIndex === 0){ lobbyCard.style.display='block'; gameArea.style.display='none'; finalCard.style.display='none'; return;}
+  if(currentStageIndex === STAGES.length-1){
+    // Final Showdown
+    prepareQuestionsForStage();
+    questionIndex = 0;
+    renderQuestion();
+  } else {
+    prepareQuestionsForStage();
+    questionIndex = 0;
+    renderQuestion();
+  }
+}
+
+function prepareQuestionsForStage(){
+  const stageKey = (currentStageIndex===1?'warm': currentStageIndex===2?'team': currentStageIndex===3?'troll':'final');
+  // Filter QUESTIONS based on stageKey
+  activeQuestions = QUESTIONS.filter(q => q.stage === stageKey).map(q=>{
+    // Normalize option objects
+    const opts = q.options.map(opt=>{
+      if(typeof opt === 'string') return {text:opt, isTroll:false};
+      return {text:opt.text ?? opt, isTroll: !!opt.isTroll};
+    });
+    return {...q, options:opts};
+  });
+  // shuffle
+  for(let i=activeQuestions.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1)); [activeQuestions[i], activeQuestions[j]]=[activeQuestions[j], activeQuestions[i]];
+  }
+}
+
+// Game flow: render question, handle option click
+function renderQuestion(){
+  if(questionIndex >= activeQuestions.length){
+    // move to next stage or final
+    if(currentStageIndex < STAGES.length-1){ advanceStage(1); return; }
+    else { showFinal(); return; }
+  }
+  const q = activeQuestions[questionIndex];
+  questionText.textContent = `${q.q}`;
+  optionsBox.innerHTML = '';
+  q.options.forEach((opt, i)=>{
+    const div = document.createElement('div'); div.className='option'; if(opt.isTroll) div.classList.add('troll');
+    div.innerHTML = `<div style="font-weight:800;">${String.fromCharCode(65+i)}.</div><div style="flex:1;">${opt.text}</div>`;
+    optionsBox.appendChild(div);
+    div.onclick = ()=> handleAnswer(i);
+  });
+  feedback.textContent=''; nextQBtn.style.display='none'; skipBtn.style.display='inline-block';
+  // update player label
+  if(players.length>0) currentPlayer.textContent = players[currentPlayerIndex].name;
+  scoreLabel.textContent = players[currentPlayerIndex]?.score ?? '0';
+}
+
+function handleAnswer(optIndex){
+  const q = activeQuestions[questionIndex];
+  const opt = q.options[optIndex];
+  const player = players[currentPlayerIndex];
+  // Determine correctness: QUESTIONS stored original 'correct' as index among options array.
+  let correctIndex = q.correct;
+  // If the data had opt objects, ensure indices align — assume correct refers to index among q.options
+  // If the option has isTroll true, apply troll behavior
+  if(opt.isTroll){
+    // Troll: subtract 1, play troll sound, flashy feedback
+    player.score = Math.max(0, player.score - 1);
+    feedback.textContent = `TROLL! ${player.name} -1 ponto! 🤡`;
+    feedback.style.color = 'crimson';
+    renderScoreboard();
+    trollSound();
+    // slight visual
+    document.querySelectorAll('.option')[optIndex].classList.add('troll');
+    // next after short delay
+    setTimeout(()=>{ nextTurn(); }, 900);
+    return;
+  }
+
+  if(optIndex === correctIndex){
+    // correct!
+    player.score += 3;
+    feedback.textContent = `Acertou! +3 pontos 🎉`;
+    feedback.style.color = 'green';
+    document.querySelectorAll('.option')[optIndex].classList.add('correct');
+    beep();
+    burstConfetti(36);
+  } else {
+    player.score = Math.max(0, player.score - 0); // neutral or small penalty
+    feedback.textContent = `Errado! A resposta certa era ${String.fromCharCode(65+correctIndex)}.`;
+    feedback.style.color = 'orange';
+    beep();
+  }
+  renderScoreboard();
+  nextQBtn.style.display='inline-block';
+  // lock options
+  document.querySelectorAll('.option').forEach(o=>o.onclick=null);
+  nextQBtn.onclick = ()=>{ questionIndex++; nextTurn(); };
+}
+
+function nextTurn(){
+  // rotate player
+  currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+  // if partyAuto, auto-advance questions
+  if(partyAuto){
+    setTimeout(()=>{ renderQuestion(); }, 300);
+  } else {
+    renderQuestion();
+  }
+}
+
+// skip
+skipBtn.onclick = ()=>{
+  feedback.textContent = 'Pergunta pulada! (Sem pontuação)';
+  questionIndex++; currentPlayerIndex = (currentPlayerIndex+1)%players.length; setTimeout(()=>renderQuestion(),500);
+};
+
+// Teams
+makeTeamsBtn.onclick = ()=>{
+  if(players.length < 2) { alert('Precisa de pelo menos 2 jogadores.'); return; }
+  // simple split into 2 teams alternately
+  const shuffled = players.slice().sort(()=>0.5-Math.random());
+  const t1 = shuffled.filter((_,i)=>i%2===0).map(p=>p.id);
+  const t2 = shuffled.filter((_,i)=>i%2===1).map(p=>p.id);
+  teams = [t1,t2];
+  renderTeams();
+};
+clearTeamsBtn.onclick = ()=>{ teams=[]; renderTeams(); };
+
+function renderTeams(){
+  teamsBox.innerHTML='';
+  if(teams.length===0){ teamsBox.textContent='Nenhuma equipe formada.'; return; }
+  teams.forEach((t,i)=>{
+    const div = document.createElement('div'); div.style.padding='8px'; div.style.borderRadius='8px';
+    div.style.background = 'linear-gradient(90deg, rgba(255,255,255,0.6), rgba(255,255,255,0.35))';
+    div.innerHTML = `<strong>Equipe ${i+1}</strong><div style="margin-top:8px;">${t.map(id=>players.find(p=>p.id===id)?.name).join(' • ')}</div>`;
+    teamsBox.appendChild(div);
+  });
+}
+
+// Final
+function showFinal(){
+  gameArea.style.display='none';
+  finalCard.style.display='block';
+  const winner = players.slice().sort((a,b)=>b.score-a.score)[0];
+  el('finalText').innerHTML = `<div style="font-size:18px; font-weight:900;">Parabéns, ${winner.name}! 🏆</div>
+  <div style="margin-top:8px;">Placar final:</div>`;
+  renderScoreboard();
+}
+
+restartBtn.onclick = ()=>{ resetAll(); };
+
+// import/export questions
+exportBtn.onclick = ()=>{
+  const data = JSON.stringify(QUESTIONS, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download = 'perguntas_casa.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+
+importBtn.onclick = ()=> importFile.click();
+importFile.onchange = (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=> {
+    try{
+      const parsed = JSON.parse(reader.result);
+      if(Array.isArray(parsed)){
+        alert('Arquivo importado! Substitua o array QUESTIONS manualmente se quiser usar no jogo (por agora a importação é só para checagem).');
+        console.log('Importado:', parsed);
+      } else alert('Formato inválido. Deve ser um array de perguntas.');
+    }catch(err){ alert('Erro lendo JSON'); }
+  };
+  reader.readAsText(f);
+};
+
+// small helpers
+function init(){
+  renderPlayers(); renderScoreboard(); renderTeams();
+}
+init();
+
+</script>
+</body>
+</html>
